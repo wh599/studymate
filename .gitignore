@@ -1,0 +1,61 @@
+# ===== 敏感信息（切勿上传到 GitHub）=====
+.env
+.env.local
+.env.*.local
+api/.env
+
+# ===== Node.js =====
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ===== 构建产物 =====
+dist/
+dist-ssr/
+build/
+*.local
+
+# ===== Vite 缓存 =====
+.vite/
+
+# ===== Python（studymate-ai 子项目预留）=====
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ===== IDE / 编辑器 =====
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ===== 操作系统 =====
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+# Linux
+*~
+
+# ===== 日志与临时文件 =====
+logs/
+*.log
+*.tmp
+*.bak
+.cache/
+
+# ===== JoyCode 工作区配置（含个人记忆，不建议上传）=====
+.joycode/

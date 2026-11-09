@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StudyMate - 学习状态感知</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+  <!-- 顶部栏（登录页隐藏）：左 🌿 StudyMate，右设置图标 -->
+  <header class="app-header hidden" id="appHeader">
+    <a class="app-brand" href="#/home">
+      <span class="app-logo">🌿</span>
+      <span class="app-title">StudyMate</span>
+    </a>
+    <button class="icon-btn" id="settingsBtn" title="设置">⚙️</button>
+  </header>
+
+  <!-- ===== 登录视图 #/login ===== -->
+  <main class="view-login hidden" id="view-login">
+    <div class="login-card">
+      <div class="login-logo">🌿</div>
+      <h1 class="login-title">StudyMate 学习教练</h1>
+      <p class="login-subtitle">你的 AI 学习状态教练</p>
+      <form id="authForm">
+        <div class="form-group">
+          <input class="form-input" type="text" id="authUsername" placeholder="用户名" autocomplete="username" />
+        </div>
+        <div class="form-group">
+          <input class="form-input" type="password" id="authPassword" placeholder="密码" autocomplete="current-password" />
+        </div>
+        <p class="login-error" id="authError"></p>
+        <button type="submit" class="btn btn-primary btn-block" id="authSubmitBtn">登录</button>
+      </form>
+      <p class="login-switch">没有账号？<a id="switchAuthMode">注册</a></p>
+      <div class="login-divider">或</div>
+      <button class="btn btn-secondary btn-block" id="guestDemoBtn">🌿 游客演示</button>
+    </div>
+  </main>
+
+  <!-- ===== 主页视图 #/home（五层结构） ===== -->
+  <main class="view-home hidden" id="view-home">
+
+    <!-- 第2层：问候语区 -->
+    <section class="home-greeting-area">
+      <h2 class="home-greeting" id="homeGreeting"></h2>
+      <p class="home-date" id="homeDate"></p>
+      <p class="home-motto" id="homeMotto"></p>
+    </section>
+
+    <!-- 第3层：双入口卡片区 -->
+    <section class="home-entry-cards">
+      <div class="entry-card entry-card-main card-enter" id="startLearningBtn" style="--delay:0ms">
+        <div class="entry-card-body">
+          <span class="entry-card-title">开始学习</span>
+          <span class="entry-card-desc">开启摄像头，实时状态监测</span>
+        </div>
+        <span class="entry-card-icon">📚</span>
+      </div>
+      <div class="entry-card entry-card-sub card-enter" id="actionHistory" style="--delay:80ms">
+        <div class="entry-card-body">
+          <span class="entry-card-title">往期数据</span>
+          <span class="entry-card-desc">历史学习记录与趋势</span>
+        </div>
+        <span class="entry-card-icon">📊</span>
+      </div>
+    </section>
+
+    <!-- 第4层：快捷术语条 -->
+    <section class="quick-chips-area">
+      <span class="quick-chips-label">试试问我：</span>
+      <div class="quick-chips" id="quickChips">
+        <button class="quick-chip" data-q="帮我制定今日学习计划">帮我制定今日学习计划</button>
+        <button class="quick-chip" data-q="分析我最近的学习状态">分析我最近的学习状态</button>
+        <button class="quick-chip" data-q="我总是学 20 分钟就分心怎么办">我总是学 20 分钟就分心怎么办</button>
+        <button class="quick-chip" data-q="给我一个番茄钟安排">给我一个番茄钟安排</button>
+        <button class="quick-chip" data-q="明天有考试，怎么复习">明天有考试，怎么复习</button>
+        <button class="quick-chip" data-q="根据往期数据给我建议">根据往期数据给我建议</button>
+      </div>
+    </section>
+
+    <!-- 第5层：教练对话框 -->
+    <section class="coach-chat" id="coachChat">
+      <div class="coach-chat-messages" id="chatMessages">
+        <div class="coach-welcome" id="coachWelcome">
+          <span class="coach-welcome-icon">🌿</span>
+          <p>你好！我是你的学习教练，把今天的学习目标发给我，我来帮你拆解成计划 ✨</p>
+        </div>
+      </div>
+      <div class="chat-status hidden" id="chatStatus">
+        <span>教练正在思考</span>
+        <span class="thinking-dots"><span></span><span></span><span></span></span>
+      </div>
+      <div class="attach-preview hidden" id="attachPreview"></div>
+      <div class="coach-chat-input">
+        <button class="chat-attach-btn" id="chatAttachBtn" title="添加附件">📎</button>
+        <input type="file" id="chatFileInput" hidden multiple accept="image/jpeg,image/png,image/webp,.txt,.md" />
+        <textarea id="chatInput" rows="1" placeholder="问问教练，或发送学习任务图片…"></textarea>
+        <button class="btn btn-primary chat-send-btn" id="chatSendBtn">发送</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===== 学习监测视图 #/study ===== -->
+  <main class="view-study hidden" id="view-study">
+    <div class="study-topbar">
+      <button class="btn btn-secondary study-back-btn" id="studyBackBtn">← 返回主页</button>
+    </div>
+    <section class="video-panel">
+      <div class="video-container" id="videoContainer">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="overlay"></canvas>
+        <div class="video-placeholder" id="videoPlaceholder">
+          <div class="placeholder-icon">📷</div>
+          <p>摄像头未开启</p>
+          <button class="btn btn-primary" id="startCameraBtn">开启摄像头</button>
+          <p class="placeholder-tip">视频画面仅在本地处理，不会上传</p>
+        </div>
+        <div class="loading-overlay" id="loadingOverlay" hidden>
+          <div class="spinner"></div>
+          <p id="loadingText">正在加载视觉模型...</p>
+          <p class="loading-tip">首次加载约需数秒，模型来自 CDN 并会被浏览器缓存</p>
+        </div>
+        <div class="error-overlay" id="errorOverlay" hidden>
+          <p class="error-icon">⚠️</p>
+          <p id="errorText"></p>
+          <button class="btn btn-secondary" id="retryBtn">重试</button>
+        </div>
+      </div>
+      <div class="video-info-bar">
+        <div class="local-indicator active" id="localIndicator">
+          <span class="indicator-dot"></span>
+          <span class="indicator-text">本地处理</span>
+        </div>
+        <span id="fpsDisplay">FPS: --</span>
+        <span id="faceStatus" class="face-status">未启动</span>
+        <label class="landmark-toggle">
+          <input type="checkbox" id="landmarkToggle" checked />
+          <span>显示关键点</span>
+        </label>
+      </div>
+      <div class="camera-controls">
+        <button class="btn btn-secondary" id="stopCameraBtn" disabled>关闭摄像头</button>
+      </div>
+    </section>
+    <aside class="metrics-panel">
+      <h2 class="panel-title">学习状态</h2>
+      <div class="state-badge state-focus" id="stateBadge">
+        <span class="state-icon" id="stateIcon">🎯</span>
+        <span class="state-text">
+          <span class="state-name" id="stateName">专注中</span>
+          <span class="state-reason" id="stateReason">等待开始</span>
+        </span>
+      </div>
+      <div class="session-controls">
+        <button class="btn btn-primary" id="sessionStartBtn" disabled>开始学习</button>
+        <button class="btn btn-secondary" id="sessionPauseBtn" disabled>暂停</button>
+        <button class="btn btn-danger" id="sessionStopBtn" disabled>结束</button>
+      </div>
+      <div class="timer-grid">
+        <div class="timer-item">
+          <span class="timer-label">本次学习</span>
+          <span class="timer-value" id="elapsedTime">00:00</span>
+        </div>
+        <div class="timer-item">
+          <span class="timer-label">连续专注</span>
+          <span class="timer-value" id="focusStreakTime">00:00</span>
+        </div>
+      </div>
+      <div class="state-durations">
+        <div class="duration-row">
+          <span class="duration-label"><span class="dot dot-focus"></span>专注</span>
+          <div class="duration-bar"><div class="duration-fill fill-focus" id="durFocus"></div></div>
+          <span class="duration-time" id="durFocusTime">0:00</span>
+        </div>
+        <div class="duration-row">
+          <span class="duration-label"><span class="dot dot-distracted"></span>分心</span>
+          <div class="duration-bar"><div class="duration-fill fill-distracted" id="durDistracted"></div></div>
+          <span class="duration-time" id="durDistractedTime">0:00</span>
+        </div>
+        <div class="duration-row">
+          <span class="duration-label"><span class="dot dot-fatigued"></span>疲劳</span>
+          <div class="duration-bar"><div class="duration-fill fill-fatigued" id="durFatigued"></div></div>
+          <span class="duration-time" id="durFatiguedTime">0:00</span>
+        </div>
+        <div class="duration-row">
+          <span class="duration-label"><span class="dot dot-absent"></span>离座</span>
+          <div class="duration-bar"><div class="duration-fill fill-absent" id="durAbsent"></div></div>
+          <span class="duration-time" id="durAbsentTime">0:00</span>
+        </div>
+      </div>
+      <div class="fatigue-tip" id="fatigueTip" hidden title="点击关闭">
+        <p>已经学习挺久了，建议起身活动一下，喝口水休息休息～</p>
+        <span class="fatigue-tip-dismiss">知道了</span>
+      </div>
+      <details class="debug-section">
+        <summary>原始指标（调试）</summary>
+        <div class="metric-item">
+          <span class="metric-label">EAR（眼睛纵横比）</span>
+          <span class="metric-value" id="earValue">--</span>
+        </div>
+        <div class="metric-bar">
+          <div class="metric-bar-fill" id="earBar"></div>
+          <div class="metric-bar-threshold" id="earThresholdMark"></div>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">Pitch 俯仰角（°）</span>
+          <span class="metric-value" id="pitchValue">--</span>
+        </div>
+        <div class="metric-hint" id="pitchHint">正常范围</div>
+        <div class="metric-item">
+          <span class="metric-label">Yaw 偏航角（°）</span>
+          <span class="metric-value" id="yawValue">--</span>
+        </div>
+        <div class="metric-hint" id="yawHint">正常范围</div>
+        <div class="metric-item">
+          <span class="metric-label">FaceRatio 人脸占比</span>
+          <span class="metric-value" id="faceRatioValue">--</span>
+        </div>
+        <div class="metric-hint" id="faceRatioHint">距离适中</div>
+        <div class="metric-item">
+          <span class="metric-label">闭眼判定</span>
+          <span class="metric-value metric-status" id="eyeStatus">--</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">玩手机判定</span>
+          <span class="metric-value metric-status" id="phoneStatus">--</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">基线校准</span>
+          <span class="metric-value metric-status" id="calibStatus">未开始</span>
+        </div>
+      </details>
+    </aside>
+
+    <!-- 结束学习后的报告覆盖层（规约：结束后先展示报告，保存到往期后跳转） -->
+    <div class="study-report-overlay hidden" id="studyReportOverlay">
+      <div class="study-report-card">
+        <div class="study-report-header">
+          <h2 class="study-report-title">本次学习报告</h2>
+        </div>
+        <div class="study-report-body" id="studyReportBody"></div>
+        <div class="study-report-actions">
+          <button class="btn btn-primary" id="saveRecordBtn">保存到往期</button>
+          <button class="btn btn-secondary" id="discardRecordBtn">放弃</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ===== 历史视图 #/history ===== -->
+  <main class="view-history hidden" id="view-history">
+    <div class="history-header">
+      <h2 class="history-title">往期数据</h2>
+    </div>
+
+    <!-- 顶部三张累计统计卡 -->
+    <div class="stat-cards" id="statCards">
+      <div class="stat-card">
+        <span class="stat-card-value" id="statTotalDays">0</span>
+        <span class="stat-card-label">累计学习天数</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-card-value" id="statTotalDuration">0分</span>
+        <span class="stat-card-label">累计学习时长</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-card-value" id="statAvgFocus">0%</span>
+        <span class="stat-card-label">平均专注占比</span>
+      </div>
+    </div>
+
+    <!-- 专注占比趋势图（7天/30天切换） -->
+    <div class="chart-card trend-card">
+      <div class="trend-header">
+        <h3 class="chart-title">专注占比趋势</h3>
+        <div class="trend-range">
+          <button class="trend-range-btn active" data-days="7">7天</button>
+          <button class="trend-range-btn" data-days="30">30天</button>
+        </div>
+      </div>
+      <div class="chart-body" id="trendChart"></div>
+    </div>
+
+    <!-- 记录列表（按日期倒序，可展开完整报告，可删除） -->
+    <h3 class="history-section-title">学习记录</h3>
+    <div class="history-list" id="historyList"></div>
+
+    <!-- 空状态 -->
+    <div class="report-empty hidden" id="reportEmpty">
+      <p class="empty-icon">📊</p>
+      <p>还没有学习记录</p>
+      <p class="empty-tip">开始一次学习并保存后，这里会展示你的学习趋势</p>
+      <button class="btn btn-primary" id="emptyStartBtn">去学习</button>
+      <button class="btn btn-secondary" id="demoDataBtn">查看演示数据</button>
+    </div>
+  </main>
+
+  <!-- ===== 设置侧滑面板 ===== -->
+  <div class="settings-backdrop hidden" id="settingsBackdrop"></div>
+  <aside class="settings-drawer hidden" id="settingsDrawer">
+    <div class="settings-drawer-header">
+      <h2 class="settings-drawer-title">设置</h2>
+      <button class="icon-btn" id="settingsCloseBtn">✕</button>
+    </div>
+    <div class="settings-drawer-body">
+      <section class="settings-card">
+        <h3 class="settings-card-title">检测阈值</h3>
+        <p class="settings-card-desc">拖动滑块调整检测灵敏度，更改即时生效并保存在本机。</p>
+        <div id="thresholdSliders"></div>
+        <div class="settings-actions">
+          <button class="btn btn-secondary" id="resetThresholdsBtn">恢复默认阈值</button>
+        </div>
+      </section>
+      <section class="settings-card">
+        <h3 class="settings-card-title">行为判定设置</h3>
+        <p class="settings-card-desc">选择哪些行为需要监测，以及将其归类为"分心"还是"疲劳"。设为"不检测"则该行为不会影响状态判定。</p>
+        <table class="behavior-table">
+          <thead>
+            <tr>
+              <th>行为</th>
+              <th>检测方式</th>
+              <th>判定为</th>
+            </tr>
+          </thead>
+          <tbody id="behaviorTableBody"></tbody>
+        </table>
+        <div class="settings-actions">
+          <button class="btn btn-secondary" id="resetSettingsBtn">恢复默认</button>
+        </div>
+      </section>
+      <section class="settings-card">
+        <h3 class="settings-card-title">数据管理</h3>
+        <p class="settings-card-desc">所有数据仅保存在本机浏览器 localStorage 中。可导出为 JSON 文件备份，或一键清空全部记录。</p>
+        <div class="settings-actions">
+          <button class="btn btn-secondary" id="exportDataBtn">导出我的数据</button>
+          <button class="btn btn-danger" id="clearDataBtn">清空数据</button>
+        </div>
+      </section>
+      <section class="settings-card">
+        <div class="settings-actions">
+          <button class="btn btn-secondary btn-block" id="logoutBtn">退出登录</button>
+        </div>
+      </section>
+    </div>
+  </aside>
+
+  <!-- ===== 隐私说明弹窗 ===== -->
+  <div class="privacy-overlay hidden" id="privacyOverlay">
+    <div class="privacy-card">
+      <h2>隐私说明</h2>
+      <ul class="privacy-list">
+        <li><strong>采集什么：</strong>仅画面内的人脸关键点坐标，用于计算眼部与头部姿态指标。</li>
+        <li><strong>不上传什么：</strong>视频帧绝不上传、绝不落盘，所有计算均在你的浏览器本地完成。</li>
+        <li><strong>数据存哪里：</strong>仅浏览器 localStorage，保存学习会话的结构化摘要（时长、状态占比等数字）。</li>
+        <li><strong>如何删除：</strong>随时可在设置中点击"清空数据"，一键删除全部本地记录。</li>
+        <li><strong>不做的事：</strong>不做人脸识别、不做身份比对、不建人脸库、不做情绪识别。</li>
+      </ul>
+      <button class="btn btn-primary btn-block" id="consentBtn">我已了解并同意</button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
