@@ -205,15 +205,15 @@ const STATE_DISPLAY = {
 const REASON_TEXT = {
   default:        '正常学习',
   no_face:        '未检测到人脸',
-  eye_closed:     '检测到闭眼',
-  perclos:        '闭眼占比过高',
+  eye_closed:     '闭眼',
+  perclos:        'PERCLOS 疲劳',
   stare_screen:   '长时间盯屏',
-  phone_use:      '玩手机中',
+  phone_use:      '玩手机',
   touch_face:     '触碰面部',
   hand_near_mouth:'手靠近嘴部',
-  head_down:      '低头时间过长',
-  head_turn:      '头部偏向一侧',
-  too_close:      '距离屏幕过近',
+  head_down:      '低头',
+  head_turn:      '转头',
+  too_close:      '距离过近',
   look_up:        '抬头仰视',
 };
 
@@ -358,6 +358,13 @@ function injectDemoData() {
   demoInjected = true;
   console.log('[StudyMate] 已注入 3 组演示会话（专注型 / 疲劳型 / 分心型）');
   renderHistoryPage();
+}
+
+/** 获取当前用户的所有记录 */
+function getAllRecords() {
+  const currentUser = getCurrentUser();
+  if (!currentUser) return [];
+  return loadRecords(currentUser);
 }
 
 /** 渲染历史页：统计卡 + 趋势图 + 记录列表 */
@@ -569,6 +576,23 @@ function bindEvents() {
   authForm.addEventListener('submit', handleAuthSubmit);
   switchAuthMode.addEventListener('click', toggleAuthMode);
   guestDemoBtn.addEventListener('click', handleGuestDemo);
+  
+  // 为登录表单添加输入框焦点效果
+  authUsername.addEventListener('focus', () => {
+    document.querySelector('.login-card').style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.3)';
+  });
+  
+  authUsername.addEventListener('blur', () => {
+    document.querySelector('.login-card').style.boxShadow = '0 10px 25px rgba(0, 0, 0, 0.1)';
+  });
+  
+  authPassword.addEventListener('focus', () => {
+    document.querySelector('.login-card').style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.3)';
+  });
+  
+  authPassword.addEventListener('blur', () => {
+    document.querySelector('.login-card').style.boxShadow = '0 10px 25px rgba(0, 0, 0, 0.1)';
+  });
 
   // ---- 设置侧滑面板事件 ----
   settingsBtn.addEventListener('click', openSettings);
@@ -643,6 +667,7 @@ function bindEvents() {
   // ---- 历史页事件 ----
   emptyStartBtn.addEventListener('click', () => navigate('#/study'));
   demoDataBtn.addEventListener('click', injectDemoData);
+  historyBackBtn.addEventListener('click', () => navigate('#/home'));
   window.addEventListener('resize', resizeCharts);
 }
 
@@ -656,6 +681,14 @@ async function handleAuthSubmit(e) {
   authError.textContent = '';
   authSubmitBtn.disabled = true;
   authSubmitBtn.textContent = '请稍候...';
+  
+  // 添加输入验证
+  if (!username.trim() || !password) {
+    authError.textContent = '请输入用户名和密码';
+    authSubmitBtn.disabled = false;
+    authSubmitBtn.textContent = isRegisterMode ? '注册' : '登录';
+    return;
+  }
 
   const result = isRegisterMode
     ? await register(username, password)
@@ -665,9 +698,15 @@ async function handleAuthSubmit(e) {
   authSubmitBtn.textContent = isRegisterMode ? '注册' : '登录';
 
   if (result.ok) {
-    navigate('#/home');
+    // 添加成功登录的视觉反馈
+    authError.textContent = '登录成功，正在跳转...';
+    authError.style.color = '#10b981'; // 绿色表示成功
+    setTimeout(() => {
+      navigate('#/home');
+    }, 500);
   } else {
     authError.textContent = result.message;
+    authError.style.color = '#ef4444'; // 红色表示错误
   }
 }
 
@@ -680,15 +719,27 @@ function toggleAuthMode() {
   switchLabel.firstChild.textContent = isRegisterMode ? '已有账号？' : '没有账号？';
   switchAuthMode.textContent = isRegisterMode ? '登录' : '注册';
   authError.textContent = '';
+  authError.style.color = ''; // 重置颜色
 }
 
 /** 游客演示 */
 async function handleGuestDemo() {
   guestDemoBtn.disabled = true;
+  guestDemoBtn.textContent = '加载中...';
   const result = await guestDemo();
   guestDemoBtn.disabled = false;
+  guestDemoBtn.textContent = '🌿 游客演示';
+  
   if (result.ok) {
-    navigate('#/home');
+    // 添加成功提示
+    authError.textContent = '演示模式已启用，正在跳转...';
+    authError.style.color = '#10b981'; // 绿色表示成功
+    setTimeout(() => {
+      navigate('#/home');
+    }, 500);
+  } else {
+    authError.textContent = result.message;
+    authError.style.color = '#ef4444'; // 红色表示错误
   }
 }
 
@@ -853,6 +904,24 @@ function showStudyReportOverlay(sessionResult) {
   studyReportOverlay.classList.remove('hidden');
 }
 
+/** 将 session 对象转换为可保存的记录 */
+function sessionToRecord(session) {
+  const now = new Date();
+  const durationSec = session.totalMs ? Math.round(session.totalMs / 1000) : 0;
+  
+  return {
+    id: 'record_' + now.getTime(),
+    date: now.toISOString(),
+    durationSec,
+    focusSec: Math.round((session.stateDurations?.FOCUS || 0) / 1000),
+    distractSec: Math.round((session.stateDurations?.DISTRACTED || 0) / 1000),
+    fatigueSec: Math.round((session.stateDurations?.FATIGUED || 0) / 1000),
+    absentSec: Math.round((session.stateDurations?.ABSENT || 0) / 1000),
+    events: session.events || [],
+    conclusion: null, // 会在用户确认后填充
+  };
+}
+
 /** 关闭报告覆盖层并释放图表实例 */
 function hideStudyReportOverlay() {
   studyReportOverlay.classList.add('hidden');
@@ -992,8 +1061,10 @@ function startCalibration() {
   calibrationStartTime = performance.now();
   baselineEar = null;
   effectiveEarThreshold = CONFIG.EAR_THRESHOLD;
-  calibStatus.textContent = '校准中...';
-  calibStatus.className = 'metric-value metric-status';
+  if (calibStatus) {
+    calibStatus.textContent = '校准中...';
+    calibStatus.className = 'metric-value metric-status';
+  }
 }
 
 function updateCalibration(ear, now) {
@@ -1006,8 +1077,10 @@ function updateCalibration(ear, now) {
     baselineEar = sum / calibrationSamples.length;
     effectiveEarThreshold = Math.max(0.15, baselineEar * CONFIG.EAR_BASELINE_RATIO);
     isCalibrating = false;
-    calibStatus.textContent = '已完成';
-    calibStatus.className = 'metric-value metric-status ok';
+    if (calibStatus) {
+      calibStatus.textContent = '已完成';
+      calibStatus.className = 'metric-value metric-status ok';
+    }
     console.log(
       `[StudyMate] 基线校准完成：baselineEar=${baselineEar.toFixed(3)}, ` +
       `自适应阈值=${effectiveEarThreshold.toFixed(3)}（默认 ${CONFIG.EAR_THRESHOLD}）`
@@ -1346,56 +1419,80 @@ function drawAlerts() {
 // ---- 指标面板更新 ----
 function updateMetricsDisplay(ear, pitch, yaw, faceRatio) {
   // EAR
-  earValue.textContent = ear.toFixed(3);
-  const earPercent = Math.min(100, (ear / 0.4) * 100); // 0.4 为满刻度
-  earBar.style.width = `${earPercent}%`;
   const closed = ear < effectiveEarThreshold;
-  earBar.className = `metric-bar-fill${closed ? ' low' : ''}`;
-  earValue.className = `metric-value${closed ? ' alert' : ' ok'}`;
+  if (earValue) {
+    earValue.textContent = ear.toFixed(3);
+    const earPercent = Math.min(100, (ear / 0.4) * 100); // 0.4 为满刻度
+    if (earBar) {
+      earBar.style.width = `${earPercent}%`;
+      earBar.className = `metric-bar-fill${closed ? ' low' : ''}`;
+    }
+    earValue.className = `metric-value${closed ? ' alert' : ' ok'}`;
+  }
 
   // 闭眼判定
-  if (closed) {
-    eyeStatus.textContent = '闭眼';
-    eyeStatus.className = 'metric-value metric-status alert';
-  } else {
-    eyeStatus.textContent = '睁眼';
-    eyeStatus.className = 'metric-value metric-status ok';
+  if (eyeStatus) {
+    if (closed) {
+      eyeStatus.textContent = '闭眼';
+      eyeStatus.className = 'metric-value metric-status alert';
+    } else {
+      eyeStatus.textContent = '睁眼';
+      eyeStatus.className = 'metric-value metric-status ok';
+    }
   }
 
   // Pitch
-  pitchValue.textContent = pitch.toFixed(1);
-  if (pitch > CONFIG.PITCH_THRESHOLD) {
-    pitchValue.className = 'metric-value warn';
-    pitchHint.textContent = `超过低头阈值 ${CONFIG.PITCH_THRESHOLD}°`;
-    pitchHint.className = 'metric-hint warn';
-  } else {
-    pitchValue.className = 'metric-value';
-    pitchHint.textContent = '正常范围';
-    pitchHint.className = 'metric-hint';
+  if (pitchValue) {
+    pitchValue.textContent = pitch.toFixed(1);
+    if (pitch > CONFIG.PITCH_THRESHOLD) {
+      pitchValue.className = 'metric-value warn';
+      if (pitchHint) {
+        pitchHint.textContent = `超过低头阈值 ${CONFIG.PITCH_THRESHOLD}°`;
+        pitchHint.className = 'metric-hint warn';
+      }
+    } else {
+      pitchValue.className = 'metric-value';
+      if (pitchHint) {
+        pitchHint.textContent = '正常范围';
+        pitchHint.className = 'metric-hint';
+      }
+    }
   }
 
   // Yaw
-  yawValue.textContent = yaw.toFixed(1);
-  if (Math.abs(yaw) > CONFIG.YAW_THRESHOLD) {
-    yawValue.className = 'metric-value warn';
-    yawHint.textContent = `超过转头阈值 ±${CONFIG.YAW_THRESHOLD}°`;
-    yawHint.className = 'metric-hint warn';
-  } else {
-    yawValue.className = 'metric-value';
-    yawHint.textContent = '正常范围';
-    yawHint.className = 'metric-hint';
+  if (yawValue) {
+    yawValue.textContent = yaw.toFixed(1);
+    if (Math.abs(yaw) > CONFIG.YAW_THRESHOLD) {
+      yawValue.className = 'metric-value warn';
+      if (yawHint) {
+        yawHint.textContent = `超过转头阈值 ±${CONFIG.YAW_THRESHOLD}°`;
+        yawHint.className = 'metric-hint warn';
+      }
+    } else {
+      yawValue.className = 'metric-value';
+      if (yawHint) {
+        yawHint.textContent = '正常范围';
+        yawHint.className = 'metric-hint';
+      }
+    }
   }
 
   // FaceRatio
-  faceRatioValue.textContent = faceRatio.toFixed(3);
-  if (faceRatio > CONFIG.FACE_RATIO_THRESHOLD) {
-    faceRatioValue.className = 'metric-value warn';
-    faceRatioHint.textContent = '距离过近，建议后退';
-    faceRatioHint.className = 'metric-hint warn';
-  } else {
-    faceRatioValue.className = 'metric-value';
-    faceRatioHint.textContent = '距离适中';
-    faceRatioHint.className = 'metric-hint';
+  if (faceRatioValue) {
+    faceRatioValue.textContent = faceRatio.toFixed(3);
+    if (faceRatio > CONFIG.FACE_RATIO_THRESHOLD) {
+      faceRatioValue.className = 'metric-value warn';
+      if (faceRatioHint) {
+        faceRatioHint.textContent = '距离过近，建议后退';
+        faceRatioHint.className = 'metric-hint warn';
+      }
+    } else {
+      faceRatioValue.className = 'metric-value';
+      if (faceRatioHint) {
+        faceRatioHint.textContent = '距离适中';
+        faceRatioHint.className = 'metric-hint';
+      }
+    }
   }
 }
 
@@ -1414,21 +1511,33 @@ function resetDisplay() {
   fpsDisplay.textContent = 'FPS: --';
   faceStatus.textContent = '未启动';
   faceStatus.className = 'face-status';
-  earValue.textContent = '--';
-  earBar.style.width = '0%';
-  pitchValue.textContent = '--';
-  yawValue.textContent = '--';
-  faceRatioValue.textContent = '--';
-  eyeStatus.textContent = '--';
-  calibStatus.textContent = '未开始';
-  calibStatus.className = 'metric-value metric-status';
+  if (earValue) {
+    earValue.textContent = '--';
+    if (earBar) earBar.style.width = '0%';
+  }
+  if (pitchValue) {
+    pitchValue.textContent = '--';
+  }
+  if (yawValue) {
+    yawValue.textContent = '--';
+  }
+  if (faceRatioValue) {
+    faceRatioValue.textContent = '--';
+  }
+  if (eyeStatus) {
+    eyeStatus.textContent = '--';
+  }
+  if (calibStatus) {
+    calibStatus.textContent = '未开始';
+    calibStatus.className = 'metric-value metric-status';
+  }
   if (phoneStatus) {
     phoneStatus.textContent = '--';
     phoneStatus.className = 'metric-value metric-status';
   }
-  pitchHint.textContent = '正常范围';
-  yawHint.textContent = '正常范围';
-  faceRatioHint.textContent = '距离适中';
+  if (pitchHint) pitchHint.textContent = '正常范围';
+  if (yawHint) yawHint.textContent = '正常范围';
+  if (faceRatioHint) faceRatioHint.textContent = '距离适中';
   latestMetrics = { ear: 0, pitch: 0, yaw: 0, faceRatio: 0 };
 
   // M2：重置检测器状态
@@ -1461,4 +1570,6 @@ function resetDisplay() {
 }
 
 // ---- 启动 ----
-init();
+document.addEventListener('DOMContentLoaded', () => {
+  init();
+});

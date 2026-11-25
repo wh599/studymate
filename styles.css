@@ -253,6 +253,11 @@ body {
   width: 100%;
   text-align: center;
   animation: card-enter 500ms ease-out;
+  transition: box-shadow 0.3s ease;
+}
+
+.login-card:focus-within {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3), var(--shadow-card-hover);
 }
 
 .login-logo {
@@ -1306,18 +1311,39 @@ body {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 12px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .metric-card {
   background: var(--card);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
-  padding: 16px 12px;
+  padding: 18px 12px;
   text-align: center;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+  border: 1px solid var(--border);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card-hover);
+}
+
+.metric-card-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--primary);
+  line-height: 1.2;
+  margin: 0;
+}
+
+.metric-card-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
 }
 
 .metric-card-value {
@@ -1438,11 +1464,27 @@ body {
   max-width: 760px;
   max-height: 88vh;
   overflow-y: auto;
-  background: var(--card-bg);
+  background: var(--card);
   border-radius: 16px;
-  padding: 28px 32px 24px;
+  padding: 32px;
   box-shadow: 0 24px 64px rgba(0,0,0,.28);
   animation: overlayIn .25s ease;
+  border: 1px solid var(--border);
+}
+.study-report-header {
+  margin-bottom: 24px;
+}
+.study-report-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.study-report-title::before {
+  content: '📊';
 }
 .study-report-actions {
   display: flex;

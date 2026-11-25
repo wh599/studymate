@@ -295,7 +295,7 @@ function setLoading(loading) {
 
 // ---- 发送：纯文本 ----
 
-async function sendToCoach(question, sessionSummary) {
+async function sendToCoach(question, sessionSummary, action = null) {
   const userMessage = buildUserMessage(question, sessionSummary || { hasData: false, recentSessions: [] });
   const username = getCurrentUser() || '';
 
@@ -310,6 +310,7 @@ async function sendToCoach(question, sessionSummary) {
         messages: chatHistory.slice(-10),
         userMessage,
         username,
+        action
       }),
       signal: controller.signal,
     });
@@ -332,7 +333,7 @@ async function sendToCoach(question, sessionSummary) {
 
 // ---- 发送：多模态（带图片） ----
 
-async function sendMultimodal(question, images, files, summary) {
+async function sendMultimodal(question, images, files, summary, action = null) {
   // 文本部分
   let textPart = question || '请识别图片中的学习任务/题目/计划表，并给出分析。';
   if (files.length > 0) {
@@ -367,6 +368,7 @@ async function sendMultimodal(question, images, files, summary) {
         userMessage: textPart,
         multimodalContent: content,
         username,
+        action
       }),
       signal: controller.signal,
     });
@@ -389,12 +391,12 @@ async function sendMultimodal(question, images, files, summary) {
 
 // ---- 发送编排 ----
 
-async function handleSend(presetQuestion) {
+async function handleSend(presetQuestion, action = null) {
   const question = presetQuestion || dom.chatInput.value.trim();
   const hasImages = attachedImages.length > 0;
   const hasFiles = attachedFiles.length > 0;
 
-  if (!question && !hasImages && !hasFiles) return;
+  if (!question && !hasImages && !hasFiles && !action) return;
 
   // 隐藏欢迎卡片
   if (dom.coachWelcome) dom.coachWelcome.classList.add('hidden');
@@ -422,7 +424,10 @@ async function handleSend(presetQuestion) {
 
     if (hasImages) {
       // 带图片 → 多模态 glm-4v-flash
-      reply = await sendMultimodal(question, images, files, summary);
+      reply = await sendMultimodal(question, images, files, summary, action);
+    } else if (action) {
+      // 特殊动作请求（如生成图片、表格）
+      reply = await sendToCoach(question, summary, action);
     } else {
       // 纯文本/文件 → glm-4-flash
       let fullQuestion = question;
@@ -435,7 +440,14 @@ async function handleSend(presetQuestion) {
 
     setLoading(false);
     const bubble = appendMessage('assistant', '');
-    typewriterStream(bubble, reply, true);
+    
+    // 如果是图片生成响应，特殊处理
+    if (action === 'generate_image') {
+      // 图片需要特殊渲染
+      bubble.innerHTML = reply;
+    } else {
+      typewriterStream(bubble, reply, true);
+    }
   } catch (err) {
     setLoading(false);
     const msg = err.name === 'AbortError'
@@ -480,6 +492,22 @@ export function initCoach(getSummary) {
   if (dom.quickChips) {
     dom.quickChips.querySelectorAll('.quick-chip').forEach((chip) => {
       chip.addEventListener('click', () => handleSend(chip.dataset.q));
+    });
+  }
+
+  // 新增：生图和制表快捷按钮
+  const generateImageButton = document.getElementById('generateImageButton');
+  const generateTableButton = document.getElementById('generateTableButton');
+  
+  if (generateImageButton) {
+    generateImageButton.addEventListener('click', () => {
+      handleSend('请为我生成一张关于学习的图像', 'generate_image');
+    });
+  }
+  
+  if (generateTableButton) {
+    generateTableButton.addEventListener('click', () => {
+      handleSend('请为我生成一个学习计划表格', 'generate_table');
     });
   }
 }

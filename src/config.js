@@ -73,14 +73,12 @@ export function recordsKey(username) {
 export const BEHAVIOR_DEFINITIONS = [
   { key: 'head_down',       label: '低头',           detect: '头部俯仰角',   defaultCategory: 'distracted' },
   { key: 'head_turn',       label: '转头',           detect: '头部偏航角',   defaultCategory: 'distracted' },
-  { key: 'too_close',       label: '距离屏幕过近',    detect: '人脸占比',     defaultCategory: 'distracted' },
   { key: 'phone_use',       label: '看手机',         detect: '手部检测',     defaultCategory: 'distracted' },
   { key: 'touch_face',      label: '触碰面部（扣脸/挠头）', detect: '手部检测', defaultCategory: 'distracted' },
   { key: 'hand_near_mouth', label: '手靠近嘴部（喝水/进食）', detect: '手部检测', defaultCategory: 'none' },
   { key: 'look_up',         label: '抬头仰视',       detect: '头部俯仰角',   defaultCategory: 'none' },
   { key: 'eye_closed',      label: '闭眼',           detect: '眼睛纵横比',   defaultCategory: 'fatigued' },
   { key: 'perclos',         label: 'PERCLOS 疲劳',   detect: '闭眼占比',     defaultCategory: 'fatigued' },
-  { key: 'stare_screen',    label: '长时间盯屏',     detect: '眨眼频率',     defaultCategory: 'fatigued' },
 ];
 
 // ---- 检测阈值滑块定义（设置侧滑面板用） ----

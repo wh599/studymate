@@ -16,7 +16,7 @@
       <span class="app-logo">🌿</span>
       <span class="app-title">StudyMate</span>
     </a>
-    <button class="icon-btn" id="settingsBtn" title="设置">⚙️</button>
+    <button class="btn btn-secondary" id="settingsBtn">规则设置</button>
   </header>
 
   <!-- ===== 登录视图 #/login ===== -->
@@ -101,6 +101,10 @@
         <textarea id="chatInput" rows="1" placeholder="问问教练，或发送学习任务图片…"></textarea>
         <button class="btn btn-primary chat-send-btn" id="chatSendBtn">发送</button>
       </div>
+      <div class="coach-extra-buttons">
+        <button class="btn btn-secondary" id="generateImageButton">🎨 生成图片</button>
+        <button class="btn btn-secondary" id="generateTableButton">📊 生成表格</button>
+      </div>
     </section>
   </main>
 
@@ -160,6 +164,10 @@
         <button class="btn btn-secondary" id="sessionPauseBtn" disabled>暂停</button>
         <button class="btn btn-danger" id="sessionStopBtn" disabled>结束</button>
       </div>
+      <div class="metric-row">
+        <span class="metric-label">校准状态</span>
+        <span class="metric-value" id="calibStatus">未开始</span>
+      </div>
       <div class="timer-grid">
         <div class="timer-item">
           <span class="timer-label">本次学习</span>
@@ -169,6 +177,30 @@
           <span class="timer-label">连续专注</span>
           <span class="timer-value" id="focusStreakTime">00:00</span>
         </div>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">EAR</span>
+        <span class="metric-value" id="earValue">--</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">俯仰角</span>
+        <span class="metric-value" id="pitchValue">--</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">偏航角</span>
+        <span class="metric-value" id="yawValue">--</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">面部比例</span>
+        <span class="metric-value" id="faceRatioValue">--</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">闭眼状态</span>
+        <span class="metric-value" id="eyeStatus">--</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">手机检测</span>
+        <span class="metric-value" id="phoneStatus">--</span>
       </div>
       <div class="state-durations">
         <div class="duration-row">
@@ -192,46 +224,15 @@
           <span class="duration-time" id="durAbsentTime">0:00</span>
         </div>
       </div>
-      <div class="fatigue-tip" id="fatigueTip" hidden title="点击关闭">
+      <div class="f
+      atigue-tip" id="fatigueTip" hidden title="点击关闭">
         <p>已经学习挺久了，建议起身活动一下，喝口水休息休息～</p>
         <span class="fatigue-tip-dismiss">知道了</span>
       </div>
-      <details class="debug-section">
-        <summary>原始指标（调试）</summary>
-        <div class="metric-item">
-          <span class="metric-label">EAR（眼睛纵横比）</span>
-          <span class="metric-value" id="earValue">--</span>
-        </div>
-        <div class="metric-bar">
-          <div class="metric-bar-fill" id="earBar"></div>
-          <div class="metric-bar-threshold" id="earThresholdMark"></div>
-        </div>
-        <div class="metric-item">
-          <span class="metric-label">Pitch 俯仰角（°）</span>
-          <span class="metric-value" id="pitchValue">--</span>
-        </div>
-        <div class="metric-hint" id="pitchHint">正常范围</div>
-        <div class="metric-item">
-          <span class="metric-label">Yaw 偏航角（°）</span>
-          <span class="metric-value" id="yawValue">--</span>
-        </div>
-        <div class="metric-hint" id="yawHint">正常范围</div>
-        <div class="metric-item">
-          <span class="metric-label">FaceRatio 人脸占比</span>
-          <span class="metric-value" id="faceRatioValue">--</span>
-        </div>
-        <div class="metric-hint" id="faceRatioHint">距离适中</div>
-        <div class="metric-item">
-          <span class="metric-label">闭眼判定</span>
-          <span class="metric-value metric-status" id="eyeStatus">--</span>
-        </div>
-        <div class="metric-item">
-          <span class="metric-label">玩手机判定</span>
-          <span class="metric-value metric-status" id="phoneStatus">--</span>
-        </div>
-        <div class="metric-item">
-          <span class="metric-label">基线校准</span>
-          <span class="metric-value metric-status" id="calibStatus">未开始</span>
+      <details class="debug-section" open>
+        <summary>学习状态记录板</summary>
+        <div class="event-log" id="eventLog">
+          <!-- 事件记录将在这里动态插入 -->
         </div>
       </details>
     </aside>
@@ -255,6 +256,7 @@
   <main class="view-history hidden" id="view-history">
     <div class="history-header">
       <h2 class="history-title">往期数据</h2>
+      <button class="btn btn-secondary history-back-btn" id="historyBackBtn">← 返回主页</button>
     </div>
 
     <!-- 顶部三张累计统计卡 -->

@@ -1,4 +1,4 @@
-/**
+/** 
  * Serverless 代理函数（第 7 章：Node.js 20，第 12 章 AI 教练设计）
  *
  * 安全要点：
@@ -23,6 +23,11 @@ const SYSTEM_PROMPT = `你是 StudyMate 的学习教练，服务对象是正在�
 5. 若数据不足以回答，直接说明缺什么，不要猜测。
 6. 涉及学习方法时，优先引用提供的知识库片段，并说明依据。
 7. 语气：平等、简洁、不夸张、不说教。不使用"加油""你真棒"这类空话。
+【功能增强】
+- 你可以根据用户要求生成学习计划、分析图表、绘制思维导图等
+- 当用户请求可视化图表时，使用Markdown格式输出
+- 当用户请求生成图片时，使用专门的提示词生成相应内容
+- 当用户请求生成表格时，使用Markdown格式输出
 【边界】
 - 不提供医疗或心理诊断建议。若用户表达明显的身心困扰，建议其寻求专业帮助。
 - 不讨论与学习状态、学习方法无关的话题，礼貌拉回。`;
@@ -38,6 +43,16 @@ const VLM_SYSTEM_PROMPT = `你是 StudyMate 的学习教练。用户发送了图
 - 涉及学习目标/任务时，输出分阶段列表（阶段目标、时长建议、休息安排），使用 Markdown 格式。
 - 语气：平等、简洁、温和。
 - 单次回答控制在 300 字以内。`;
+
+// ---- 图片生成系统提示词 ----
+const IMAGE_GEN_SYSTEM_PROMPT = `你是一个专业的图像生成助手。根据用户请求生成符合要求的图像。
+
+【图像生成规则】
+1. 使用 DALL-E 或类似模型生成图像
+2. 图像风格：简洁、清晰、适合学习场景
+3. 如果用户请求生成图表或数据可视化，生成对应的图表样式图像
+4. 图像尺寸：1024x1024像素
+5. 生成图像时需要考虑学习相关的元素，如书本、笔记本、学习桌等`;
 
 // ---- 频率限制（每 IP 每分钟 10 次） ----
 const RATE_LIMIT_MAX = 10;
@@ -100,6 +115,20 @@ async function callLLM(messages, model, maxTokens = 500) {
   }
 }
 
+// ---- 图像生成函数 ----
+async function generateImage(prompt) {
+  // 这里可以集成图像生成API，比如DALL-E等
+  // 目前返回一个占位符，实际应用中需要替换为真实API调用
+  const apiKey = process.env.IMAGE_API_KEY;
+  if (!apiKey) {
+    throw Object.assign(new Error('缺少 IMAGE_API_KEY 环境变量'), { code: 'NO_IMAGE_API_KEY' });
+  }
+  
+  // 模拟图像生成过程
+  // 实际项目中这里应该调用图像生成API
+  return `![生成的图像](placeholder_image_${Date.now()}.png)`;
+}
+
 export default async function handler(req, res) {
   // 仅接受 POST
   if (req.method !== 'POST') {
@@ -133,7 +162,7 @@ export default async function handler(req, res) {
     return;
   }
 
-  const { messages, userMessage, multimodalContent, username } = body || {};
+  const { messages, userMessage, multimodalContent, username, action } = body || {};
 
   // 系统提示词追加用户名
   let systemPrompt = SYSTEM_PROMPT;
@@ -161,6 +190,42 @@ export default async function handler(req, res) {
           ? '图片分析超时，请稍后再试。'
           : '图片分析暂时不可用，请稍后再试。';
       res.status(503).json({ error: 'COACH_UNAVAILABLE', message: friendlyMessage });
+    }
+    return;
+  }
+
+  // 图像生成请求
+  if (action === 'generate_image') {
+    try {
+      const imagePrompt = userMessage || '生成一张关于学习的图像';
+      const imageUrl = await generateImage(imagePrompt);
+      res.status(200).json({ reply: imageUrl, isImage: true });
+    } catch (err) {
+      console.error(`[StudyMate] /api/chat 图像生成错误 [${err.code || 'UNKNOWN'}]:`, err.message);
+      const friendlyMessage = err.code === 'NO_IMAGE_API_KEY'
+        ? '图像生成服务未配置，请联系管理员。'
+        : '图像生成暂时不可用，请稍后再试。';
+      res.status(503).json({ error: 'IMAGE_GENERATION_FAILED', message: friendlyMessage });
+    }
+    return;
+  }
+
+  // 表格生成请求
+  if (action === 'generate_table') {
+    try {
+      // 这里可以调用LLM生成表格
+      const tablePrompt = userMessage || '生成一个学习计划表格';
+      const llmMessages = [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: `请生成一个Markdown格式的表格，主题为：${tablePrompt}` }
+      ];
+      
+      const reply = await callLLM(llmMessages, undefined, 600);
+      res.status(200).json({ reply });
+    } catch (err) {
+      console.error(`[StudyMate] /api/chat 表格生成错误 [${err.code || 'UNKNOWN'}]:`, err.message);
+      const friendlyMessage = '表格生成暂时不可用，请稍后再试。';
+      res.status(503).json({ error: 'TABLE_GENERATION_FAILED', message: friendlyMessage });
     }
     return;
   }
