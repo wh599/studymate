@@ -280,6 +280,8 @@ function renderPie(targetEl, stateDurations, totalMs) {
     }))
     .filter((d) => d.value > 0);
 
+  const valueOf = Object.fromEntries(data.map((d) => [d.name, d.value]));
+
   chart.setOption({
     tooltip: { formatter: '{b}：{c}%' },
     legend: {
@@ -287,21 +289,20 @@ function renderPie(targetEl, stateDurations, totalMs) {
       icon: 'circle',
       itemWidth: 10,
       itemHeight: 10,
-      textStyle: { fontSize: 12, color: '#64748B' },
+      itemGap: 8,
+      textStyle: { fontSize: 11, color: '#64748B' },
+      // 状态名 + 占比都放进图例：饼图本身不画引线标签，避免小尺寸卡片里被裁切
+      formatter: (name) => `${name} ${valueOf[name] ?? 0}%`,
     },
     series: [
       {
         type: 'pie',
-        radius: ['42%', '68%'],
+        radius: ['44%', '66%'],
         center: ['50%', '42%'],
         avoidLabelOverlap: true,
-        label: {
-          show: true,
-          formatter: '{b}\n{c}%',
-          fontSize: 11,
-          color: '#64748B',
-        },
-        emphasis: { label: { show: true, fontWeight: 'bold' } },
+        label: { show: false },
+        labelLine: { show: false },
+        emphasis: { label: { show: false } },
         data,
       },
     ],
@@ -366,7 +367,7 @@ export function renderTrendChart(targetEl, records, days) {
       type: 'category',
       boundaryGap: false,
       data: xData,
-      axisLabel: { fontSize: 11, color: '#64748B' },
+      axisLabel: { fontSize: 11, color: '#64748B', interval: days > 7 ? 2 : 0, hideOverlap: true },
       axisLine: { lineStyle: { color: '#E2E8F0' } },
     },
     yAxis: {

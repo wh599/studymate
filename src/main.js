@@ -22,6 +22,7 @@ import { updateStateMachine, STATES, resetStateMachine, getState } from './state
 import { createSession } from './session.js';
 import { saveRecord, loadRecords, deleteRecord, clearAllData } from './storage.js';
 import { getDemoSessions } from './demoData.js';
+import { ensureSeedData, resetSeedData } from './seedData.js';
 import { renderReportInto, renderTrendChart, resizeCharts, computeStats, generateAdvice } from './report.js';
 import { initCoach, buildSessionSummary, clearChatHistory } from './coach.js';
 import { register, login, guestDemo, logout, getCurrentUser, isLoggedIn } from './auth.js';
@@ -103,6 +104,7 @@ const logoutBtn = document.getElementById('logoutBtn');
   // ---- DOM 引用：历史页统计卡与趋势图 ----
   const statTotalDays = document.getElementById('statTotalDays');
   const statTotalDuration = document.getElementById('statTotalDuration');
+  const statTotalDurationSub = document.getElementById('statTotalDurationSub');
   const statAvgFocus = document.getElementById('statAvgFocus');
   const trendChart = document.getElementById('trendChart');
 
@@ -185,7 +187,7 @@ let fatigueTipShown = false;  // 本次疲劳周期是否已弹过提示
 let lastSessionResult = null; // 最近一次会话结果（供教练引用）
 let pendingRecord = null;       // 结束会话后待保存的记录（报告覆盖层展示中）
 let pendingReportHandle = null; // 覆盖层报告实例（用于 dispose 释放图表）
-let currentTrendDays = 7;       // 趋势图当前展示天数（7 / 30）
+let currentTrendDays = 30;      // 趋势图当前展示天数（7 / 30），默认看近 30 天
 
 // ---- 独立计时器：与视觉检测帧解耦，保证视觉异常时计时依然正常 ----
 let sessionTimerId = null;      // setInterval 句柄
@@ -349,6 +351,26 @@ function renderHomePage() {
 
 // 演示数据注入标记（内存态，不写入 localStorage，避免污染真实会话数据）
 let demoInjected = false;
+// 被用户主动删掉的演示记录（仅内存，避免刷新/重渲染后又冒出来）
+const hiddenDemoIds = new Set();
+
+/**
+ * 演示会话 → 存档记录结构（与 storage.js 的 record 一致，仅内存使用）
+ * @param {Object} session 第 9.2 章 schema 的会话对象
+ */
+function demoSessionToRecord(session) {
+  return {
+    id: session.sessionId,
+    date: new Date(session.startedAt).toISOString(),
+    durationSec: Math.round(session.totalMs / 1000),
+    focusSec: Math.round((session.stateDurations.FOCUS || 0) / 1000),
+    distractSec: Math.round((session.stateDurations.DISTRACTED || 0) / 1000),
+    fatigueSec: Math.round((session.stateDurations.FATIGUED || 0) / 1000),
+    absentSec: Math.round((session.stateDurations.ABSENT || 0) / 1000),
+    events: session.events || [],
+    conclusion: null,
+  };
+}
 
 /**
  * 注入演示数据（FR-10）：内存合并 3 组演示会话，重新渲染历史页
@@ -356,19 +378,29 @@ let demoInjected = false;
  */
 function injectDemoData() {
   demoInjected = true;
+  hiddenDemoIds.clear();
   console.log('[StudyMate] 已注入 3 组演示会话（专注型 / 疲劳型 / 分心型）');
   renderHistoryPage();
 }
 
-/** 获取当前用户的所有记录 */
+/** 获取当前用户的所有记录（含内存态演示会话） */
 function getAllRecords() {
   const currentUser = getCurrentUser();
   if (!currentUser) return [];
-  return loadRecords(currentUser);
+  const records = loadRecords(currentUser);
+  if (!demoInjected) return records;
+  for (const session of getDemoSessions()) {
+    const record = demoSessionToRecord(session);
+    if (hiddenDemoIds.has(record.id)) continue;
+    if (!records.some((r) => r.id === record.id)) records.push(record);
+  }
+  return records;
 }
 
 /** 渲染历史页：统计卡 + 趋势图 + 记录列表 */
 function renderHistoryPage() {
+  // 首次进入时补齐 18 天使用记录（只在没有记录时注入一次，之后以本地数据为准）
+  ensureSeedData(getCurrentUser());
   const records = getAllRecords();
   renderStatCards(records);
   renderTrendChart(trendChart, records, currentTrendDays);
@@ -390,15 +422,25 @@ function renderStatCards(records) {
   const avgFocus = totalDuration > 0 ? focusSum / totalDuration : 0;
   statTotalDays.textContent = String(totalDays);
   statTotalDuration.textContent = formatStatDuration(totalDuration);
+  if (statTotalDurationSub) {
+    statTotalDurationSub.textContent = formatStatDurationSub(totalDuration);
+  }
   statAvgFocus.textContent = Math.round(avgFocus * 100) + '%';
 }
 
-/** 秒数 → 中文时长（如 "2 小时 15 分"） */
+/** 秒数 → 累计时长主数值（以分钟计，如 "1921 分钟"） */
 function formatStatDuration(sec) {
-  const h = Math.floor(sec / 3600);
-  const m = Math.round((sec % 3600) / 60);
-  if (h > 0) return m > 0 ? h + ' 小时 ' + m + ' 分' : h + ' 小时';
-  return m + ' 分钟';
+  const minutes = Math.round(sec / 60);
+  return minutes + ' 分钟';
+}
+
+/** 秒数 → 累计时长副标题（折算成小时，如 "≈ 32 小时 1 分"） */
+function formatStatDurationSub(sec) {
+  const minutes = Math.round(sec / 60);
+  if (minutes < 60) return '';
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return '≈ ' + h + ' 小时' + (m > 0 ? ' ' + m + ' 分' : '');
 }
 
 /** 创建历史记录列表项（懒加载报告 + 两步删除确认） */
@@ -410,7 +452,9 @@ function createHistoryItem(record) {
   const timeText = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
   const min = Math.max(1, Math.round(record.durationSec / 60));
   const focusPct = record.durationSec > 0 ? Math.round((record.focusSec / record.durationSec) * 100) : 0;
-  const fatigueTxt = record.fatigueCount > 0 ? '疲劳 ' + record.fatigueCount + ' 次' : '无疲劳预警';
+  // 疲劳次数取自状态切换事件（记录里只存了时长，没有单独的计数字段）
+  const fatigueCount = (record.events || []).filter((e) => e.state === 'FATIGUED').length;
+  const fatigueTxt = fatigueCount > 0 ? '疲劳预警 ' + fatigueCount + ' 次' : '无疲劳预警';
   item.innerHTML =
     '<div class="history-item-summary">' +
     '<span class="history-item-date">' + dateText + ' ' + timeText + '</span>' +
@@ -436,9 +480,10 @@ function createHistoryItem(record) {
       expand.classList.add('hidden');
       item.classList.remove('expanded');
     } else {
-      if (!reportHandle) reportHandle = renderReportInto(expand, record);
+      // 先显示容器再渲染：ECharts 在 display:none 的容器里会拿到 0 宽度，图会被压扁
       expand.classList.remove('hidden');
       item.classList.add('expanded');
+      if (!reportHandle) reportHandle = renderReportInto(expand, record);
     }
   });
   // 删除按钮：两步确认（3 秒超时自动取消）
@@ -455,7 +500,12 @@ function createHistoryItem(record) {
     }
     clearTimeout(confirmTimer);
     if (reportHandle && reportHandle.dispose) reportHandle.dispose();
-    deleteRecord(getCurrentUser(), record.id);
+    if (String(record.id).startsWith('demo-')) {
+      // 演示会话只在内存里，记住"删过了"，重渲染时不再出现
+      hiddenDemoIds.add(record.id);
+    } else {
+      deleteRecord(getCurrentUser(), record.id);
+    }
     renderHistoryPage();
   });
   return item;
@@ -576,23 +626,6 @@ function bindEvents() {
   authForm.addEventListener('submit', handleAuthSubmit);
   switchAuthMode.addEventListener('click', toggleAuthMode);
   guestDemoBtn.addEventListener('click', handleGuestDemo);
-  
-  // 为登录表单添加输入框焦点效果
-  authUsername.addEventListener('focus', () => {
-    document.querySelector('.login-card').style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.3)';
-  });
-  
-  authUsername.addEventListener('blur', () => {
-    document.querySelector('.login-card').style.boxShadow = '0 10px 25px rgba(0, 0, 0, 0.1)';
-  });
-  
-  authPassword.addEventListener('focus', () => {
-    document.querySelector('.login-card').style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.3)';
-  });
-  
-  authPassword.addEventListener('blur', () => {
-    document.querySelector('.login-card').style.boxShadow = '0 10px 25px rgba(0, 0, 0, 0.1)';
-  });
 
   // ---- 设置侧滑面板事件 ----
   settingsBtn.addEventListener('click', openSettings);
@@ -613,6 +646,22 @@ function bindEvents() {
     exportMyData();
     console.log('[StudyMate] 数据已导出');
   });
+  // 重新生成演示数据：清空当前用户记录，按今天重建 18 天（答辩前刷新数据用）
+  const resetDemoBtn = document.getElementById('resetDemoBtn');
+  if (resetDemoBtn) {
+    resetDemoBtn.addEventListener('click', () => {
+      const n = resetSeedData(getCurrentUser());
+      demoInjected = false;
+      console.log(`[StudyMate] 已重新生成 ${n} 天演示数据`);
+      if (getCurrentRoute() === '#/history') renderHistoryPage();
+      resetDemoBtn.textContent = '已生成';
+      resetDemoBtn.disabled = true;
+      setTimeout(() => {
+        resetDemoBtn.textContent = '重新生成演示数据';
+        resetDemoBtn.disabled = false;
+      }, 1500);
+    });
+  }
   // 清空数据：二次确认（两步点击式，3 秒内不确认则自动取消）
   let clearConfirmTimer = null;
   clearDataBtn.addEventListener('click', () => {
@@ -673,22 +722,18 @@ function bindEvents() {
 
 // ---- 登录/注册/游客 ----
 
-/** 登录/注册表单提交 */
+/**
+ * 登录/注册表单提交
+ * 演示版（无后端）：账号密码只做形式校验，任意组合都能进入，不写入任何账号信息。
+ */
 async function handleAuthSubmit(e) {
   e.preventDefault();
   const username = authUsername.value;
   const password = authPassword.value;
   authError.textContent = '';
+  authError.style.color = '';
   authSubmitBtn.disabled = true;
-  authSubmitBtn.textContent = '请稍候...';
-  
-  // 添加输入验证
-  if (!username.trim() || !password) {
-    authError.textContent = '请输入用户名和密码';
-    authSubmitBtn.disabled = false;
-    authSubmitBtn.textContent = isRegisterMode ? '注册' : '登录';
-    return;
-  }
+  authSubmitBtn.textContent = '正在' + (isRegisterMode ? '注册' : '登录') + '...';
 
   const result = isRegisterMode
     ? await register(username, password)
@@ -698,12 +743,11 @@ async function handleAuthSubmit(e) {
   authSubmitBtn.textContent = isRegisterMode ? '注册' : '登录';
 
   if (result.ok) {
-    // 添加成功登录的视觉反馈
     authError.textContent = '登录成功，正在跳转...';
     authError.style.color = '#10b981'; // 绿色表示成功
     setTimeout(() => {
       navigate('#/home');
-    }, 500);
+    }, 450);
   } else {
     authError.textContent = result.message;
     authError.style.color = '#ef4444'; // 红色表示错误

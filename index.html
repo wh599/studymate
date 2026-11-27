@@ -36,6 +36,7 @@
         <button type="submit" class="btn btn-primary btn-block" id="authSubmitBtn">登录</button>
       </form>
       <p class="login-switch">没有账号？<a id="switchAuthMode">注册</a></p>
+      <p class="login-note">演示版：不校验账号密码，任意填写均可进入</p>
       <div class="login-divider">或</div>
       <button class="btn btn-secondary btn-block" id="guestDemoBtn">🌿 游客演示</button>
     </div>
@@ -266,7 +267,8 @@
         <span class="stat-card-label">累计学习天数</span>
       </div>
       <div class="stat-card">
-        <span class="stat-card-value" id="statTotalDuration">0分</span>
+        <span class="stat-card-value" id="statTotalDuration">0 分钟</span>
+        <span class="stat-card-sub" id="statTotalDurationSub"></span>
         <span class="stat-card-label">累计学习时长</span>
       </div>
       <div class="stat-card">
@@ -278,10 +280,13 @@
     <!-- 专注占比趋势图（7天/30天切换） -->
     <div class="chart-card trend-card">
       <div class="trend-header">
-        <h3 class="chart-title">专注占比趋势</h3>
+        <div class="trend-heading">
+          <h3 class="chart-title">专注占比趋势</h3>
+          <p class="trend-hint">近 30 天每天的平均专注占比，断点表示当天休息</p>
+        </div>
         <div class="trend-range">
-          <button class="trend-range-btn active" data-days="7">7天</button>
-          <button class="trend-range-btn" data-days="30">30天</button>
+          <button class="trend-range-btn" data-days="7">7天</button>
+          <button class="trend-range-btn active" data-days="30">30天</button>
         </div>
       </div>
       <div class="chart-body" id="trendChart"></div>
@@ -339,6 +344,7 @@
         <p class="settings-card-desc">所有数据仅保存在本机浏览器 localStorage 中。可导出为 JSON 文件备份，或一键清空全部记录。</p>
         <div class="settings-actions">
           <button class="btn btn-secondary" id="exportDataBtn">导出我的数据</button>
+          <button class="btn btn-secondary" id="resetDemoBtn">重新生成演示数据</button>
           <button class="btn btn-danger" id="clearDataBtn">清空数据</button>
         </div>
       </section>

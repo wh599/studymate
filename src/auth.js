@@ -1,104 +1,56 @@
-// ===== 本地账号系统（演示级，不建后端） =====
-// localStorage 键：
-//   studymateusers    → [{ username, passHash }]（密码用 Web Crypto API 做 SHA-256）
-//   studymatesession  → 当前登录用户名
-// 安全说明：演示级方案，SHA-256 无盐仅防明文直读，不防彩虹表/暴力破解。
+// ===== 登录（演示版：假登录，只记住"当前是谁"，不存任何账号密码） =====
+//
+// 用途：给评委演示完整的"登录 → 主页 → 学习 → 往期数据"流程。
+// 规则：用户名 + 密码任意填写都能进入（空着也行，默认以"同学"进入）。
+// 安全：本地没有任何后端，也刻意不保存密码；localStorage 里只有一个当前用户名。
+//       旧版本残留的 studymateusers（哈希表）会在登录时顺手清掉。
 
-const KEY_USERS = 'studymateusers';
 const KEY_SESSION = 'studymatesession';
+const LEGACY_KEY_USERS = 'studymateusers';
+const DEFAULT_NAME = '同学';
 
-/**
- * SHA-256 哈希（Web Crypto API）
- * @param {string} text 明文
- * @returns {Promise<string>} 十六进制哈希值
- */
-async function sha256(text) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(text);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
-/** 读取用户列表 */
-function loadUsers() {
-  try {
-    const raw = localStorage.getItem(KEY_USERS);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-/** 保存用户列表 */
-function saveUsers(users) {
-  localStorage.setItem(KEY_USERS, JSON.stringify(users));
+/** 模拟一次网络请求的等待，让登录过程看起来更真实 */
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
- * 注册新用户
- * @param {string} username 用户名（1-20 字符）
- * @param {string} password 密码（≥ 4 字符）
- * @returns {Promise<{ok: boolean, message: string}>}
- */
-export async function register(username, password) {
-  const name = (username || '').trim();
-  if (!name || name.length > 20) {
-    return { ok: false, message: '用户名需为 1-20 个字符' };
-  }
-  if (!password || password.length < 4) {
-    return { ok: false, message: '密码至少 4 个字符' };
-  }
-
-  const users = loadUsers();
-  if (users.some((u) => u.username === name)) {
-    return { ok: false, message: '该用户名已被注册' };
-  }
-
-  const passHash = await sha256(name + ':' + password); // 用户名做简单盐
-  users.push({ username: name, passHash });
-  saveUsers(users);
-
-  // 注册成功即登录
-  setCurrentUser(name);
-  return { ok: true, message: '注册成功' };
-}
-
-/**
- * 登录
+ * 登录：任意用户名 / 密码都通过，用户名会作为"当前用户"记在本机
  * @param {string} username
  * @param {string} password
  * @returns {Promise<{ok: boolean, message: string}>}
  */
 export async function login(username, password) {
-  const name = (username || '').trim();
-  if (!name || !password) {
-    return { ok: false, message: '请输入用户名和密码' };
-  }
-
-  const users = loadUsers();
-  const passHash = await sha256(name + ':' + password);
-  const user = users.find((u) => u.username === name && u.passHash === passHash);
-
-  if (!user) {
-    return { ok: false, message: '用户名或密码错误' };
-  }
-
+  const name = (username || '').trim() || DEFAULT_NAME;
+  await delay(420);
+  // 演示版不校验密码，也不记录密码；旧版哈希表一并清理
+  localStorage.removeItem(LEGACY_KEY_USERS);
   setCurrentUser(name);
+  void password;
   return { ok: true, message: '登录成功' };
 }
 
 /**
- * 游客演示：一键以 demo 用户进入（自动创建）
+ * 注册：同样不做任何校验，注册即登录（演示版没有账号体系）
+ * @param {string} username
+ * @param {string} password
+ * @returns {Promise<{ok: boolean, message: string}>}
+ */
+export async function register(username, password) {
+  const name = (username || '').trim() || DEFAULT_NAME;
+  await delay(420);
+  localStorage.removeItem(LEGACY_KEY_USERS);
+  setCurrentUser(name);
+  void password;
+  return { ok: true, message: '注册成功' };
+}
+
+/**
+ * 游客演示：一键以 demo 用户进入
  * @returns {Promise<{ok: boolean, message: string}>}
  */
 export async function guestDemo() {
-  const users = loadUsers();
-  if (!users.some((u) => u.username === 'demo')) {
-    const passHash = await sha256('demo:demo1234');
-    users.push({ username: 'demo', passHash });
-    saveUsers(users);
-  }
+  await delay(260);
   setCurrentUser('demo');
   return { ok: true, message: '已进入演示模式' };
 }
